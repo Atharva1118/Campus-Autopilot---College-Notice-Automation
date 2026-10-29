@@ -1,0 +1,848 @@
+{
+  "name": "Campus Autopilot - College Notice Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Campus Autopilot - Submit College Notice",
+        "formDescription": "Select the target students and enter the notice text.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Branch",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "CSE"
+                  },
+                  {
+                    "option": "CSE-DS"
+                  },
+                  {
+                    "option": "CSE-AIML"
+                  },
+                  {
+                    "option": "Civil"
+                  },
+                  {
+                    "option": "Mechanical"
+                  },
+                  {
+                    "option": "ENTC"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Year",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "SY"
+                  },
+                  {
+                    "option": "TY"
+                  },
+                  {
+                    "option": "Final Year"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Division",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "A"
+                  },
+                  {
+                    "option": "B"
+                  },
+                  {
+                    "option": "C"
+                  },
+                  {
+                    "option": "D"
+                  },
+                  {
+                    "option": "E"
+                  },
+                  {
+                    "option": "F"
+                  },
+                  {
+                    "option": "G"
+                  },
+                  {
+                    "option": "H"
+                  },
+                  {
+                    "option": "I"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Notice Text",
+              "fieldType": "textarea",
+              "placeholder": "Paste the notice exactly as it should be understood",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit Notice",
+          "path": "campus-autopilot-notice"
+        }
+      },
+      "id": "b6ad9fd1-cf77-4988-b43d-ec9cb053a898",
+      "name": "Submit College Notice",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        320
+      ],
+      "webhookId": "d30c926e-88a4-41fa-b427-4464a35fb278"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst yearMap = { 'SY': 2, 'TY': 3, 'Final Year': 4 };\nconst branches = ['CSE','CSE-DS','CSE-AIML','Civil','Mechanical','ENTC'];\nconst divisions = ['A','B','C','D','E','F','G','H','I'];\nconst branch = String(j['Branch'] || '').trim();\nconst yearLabel = String(j['Year'] || '').trim();\nconst division = String(j['Division'] || '').trim().toUpperCase();\nconst noticeText = String(j['Notice Text'] || '').trim();\nconst errors = [];\nif (!branches.includes(branch)) errors.push('Invalid or missing Branch');\nif (!(yearLabel in yearMap)) errors.push('Invalid or missing Year');\nif (!divisions.includes(division)) errors.push('Invalid or missing Division');\nif (noticeText.length < 5) errors.push('Notice Text is missing or too short');\nreturn { json: {\n  branch, year_label: yearLabel, year_num: yearMap[yearLabel] || null, division,\n  notice_text: noticeText,\n  submitted_at: j.submittedAt || new Date().toISOString(),\n  test_mode: false,\n  live_send_authorized: true,\n  valid: errors.length === 0,\n  errors\n} };"
+      },
+      "id": "0e342e34-5633-4864-a69f-e24c1d3cc707",
+      "name": "Validate Form Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "164e9616-f337-4353-bab6-05868e8a49ae",
+      "name": "Form Is Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-haiku-5-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Notice text:\n\"\"\"\n{{ $(\"Validate Form Fields\").item.json.notice_text }}\n\"\"\"\n\nCurrent date (Asia/Kolkata): {{ $now.setZone(\"Asia/Kolkata\").toFormat(\"yyyy-MM-dd EEEE\") }}\nSelected branch: {{ $(\"Validate Form Fields\").item.json.branch }}; year: {{ $(\"Validate Form Fields\").item.json.year_label }}; division: {{ $(\"Validate Form Fields\").item.json.division }}"
+            }
+          ]
+        },
+        "options": {
+          "system": "You extract structured data from college notices. Return ONLY one JSON object, no markdown, with exactly these keys: event_type, title, description, venue, branch, year, division, start_date (YYYY-MM-DD), start_time (HH:mm 24h), end_date (YYYY-MM-DD), end_time (HH:mm 24h), deadline, links (array of strings), summary. Use null for anything not explicitly stated in the notice. Never invent dates, times, or venues. Resolve relative dates like \"tomorrow\" using the provided current date only when the notice states them.",
+          "maxTokens": 800
+        }
+      },
+      "id": "f8199593-dac1-45c9-86c9-dfe34e20800a",
+      "name": "AI Extract Notice Fields",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        704,
+        -192
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "anthropicApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const form = $('Validate Form Fields').item.json;\nconst keys = ['event_type','title','description','venue','branch','year','division','start_date','start_time','end_date','end_time','deadline','links','summary'];\nconst empty = {}; keys.forEach(k => empty[k] = null); empty.links = [];\nlet raw = '';\nconst j = $json;\nif (j.error) raw = '';\nelse if (Array.isArray(j.content)) raw = (j.content.find(b => b.type === 'text') || {}).text || '';\nelse raw = j.text || j.output || '';\nlet ai = null, aiOk = false, aiError = j.error ? 'AI service error: ' + (j.error.message || JSON.stringify(j.error)).slice(0, 200) : null;\nif (raw) {\n  try {\n    const cleaned = String(raw).replace(/^\\s*```(?:json)?/i, '').replace(/```\\s*$/,'').trim();\n    const p = JSON.parse(cleaned);\n    if (p && typeof p === 'object' && !Array.isArray(p)) { ai = p; aiOk = true; }\n    else aiError = 'AI response was not a JSON object';\n  } catch (e) { aiError = 'AI response was not valid JSON'; }\n} else if (!aiError) aiError = 'AI response was empty';\nconst clean = Object.assign({}, empty);\nif (aiOk) keys.forEach(k => { if (ai[k] !== undefined) clean[k] = ai[k]; });\nconst dateOk = d => typeof d === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(d);\nconst timeOk = t => typeof t === 'string' && /^\\d{2}:\\d{2}$/.test(t);\nif (!dateOk(clean.start_date)) clean.start_date = null;\nif (!timeOk(clean.start_time)) clean.start_time = null;\nif (!dateOk(clean.end_date)) clean.end_date = null;\nif (!timeOk(clean.end_time)) clean.end_time = null;\nif (!Array.isArray(clean.links)) clean.links = [];\n// Faculty form selection always wins over AI for targeting\nreturn { json: Object.assign({}, form, { ai_ok: aiOk, ai_error: aiError, extracted: clean }) };"
+      },
+      "id": "81f116c0-1dc8-4a5d-bf77-2641e07d9009",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "13xh_36WFLCp3ySDyBxL5Qe5OTc5y5YXypnC8vzK7Q3Y",
+          "mode": "list",
+          "cachedResultName": "Campus Autopilot — Student Directory",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/13xh_36WFLCp3ySDyBxL5Qe5OTc5y5YXypnC8vzK7Q3Y/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Students"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Branch",
+              "lookupValue": "={{ $(\"Parse AI Response\").item.json.branch }}"
+            },
+            {
+              "lookupColumn": "Year",
+              "lookupValue": "={{ $(\"Parse AI Response\").item.json.year_num }}"
+            },
+            {
+              "lookupColumn": "Division",
+              "lookupValue": "={{ $(\"Parse AI Response\").item.json.division }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9a6dfa52-c121-466d-aacb-046322ff5c6b",
+      "name": "Get Row(s) in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1280,
+        -192
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "76wJochRPmrJpbkr",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Parse AI Response').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && Object.keys(r).length > 0);\nconst emailRe = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nconst seen = new Set(); const recipients = []; const invalid = []; const mismatched = [];\nfor (const r of rows) {\n  // Safety: never accept a row outside the selected Branch + Year + Division\n  const okMatch = String(r.Branch).trim() === ctx.branch && Number(r.Year) === ctx.year_num && String(r.Division).trim().toUpperCase() === ctx.division;\n  if (!okMatch) { mismatched.push(r.Roll_No || r.Email || 'unknown'); continue; }\n  const email = String(r.Email || '').trim().toLowerCase();\n  if (!emailRe.test(email)) { invalid.push({ roll_no: r.Roll_No || null, email: r.Email || null }); continue; }\n  if (seen.has(email)) continue;\n  seen.add(email);\n  recipients.push({ roll_no: r.Roll_No, name: r.Name, email });\n}\nconst raw = JSON.stringify([ctx.branch, ctx.year_num, ctx.division, ctx.notice_text]);\nlet h = 0; for (let i = 0; i < raw.length; i++) { h = ((h << 5) - h + raw.charCodeAt(i)) | 0; }\nconst hash = 'n' + Math.abs(h);\nconst sd = $getWorkflowStaticData('global');\nconst duplicate = !!(sd.sent && sd.sent[hash]);\nreturn [{ json: Object.assign({}, ctx, { recipients, recipient_count: recipients.length, invalid_emails: invalid, mismatched_rows: mismatched, notice_hash: hash, duplicate_submission: duplicate }) }];"
+      },
+      "id": "31645df0-cc99-4e51-a102-4616edcb0570",
+      "name": "Validate and Deduplicate Recipients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d",
+              "leftValue": "={{ $json.extracted.start_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "t",
+              "leftValue": "={{ $json.extracted.start_time }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "29339d79-31c8-4ea8-9e7d-a0b3673e168a",
+      "name": "Has Schedule?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1904,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "ghorpadeatharva87@gmail.com",
+          "mode": "list",
+          "cachedResultName": "ghorpadeatharva87@gmail.com"
+        },
+        "returnAll": true,
+        "timeMin": "={{ DateTime.fromISO($json.extracted.start_date + \"T\" + $json.extracted.start_time, { zone: \"Asia/Kolkata\" }).toISO() }}",
+        "timeMax": "={{ DateTime.fromISO(($json.extracted.end_date || $json.extracted.start_date) + \"T\" + ($json.extracted.end_time || $json.extracted.start_time), { zone: \"Asia/Kolkata\" }).plus($json.extracted.end_time ? { minutes: 0 } : { hours: 1 }).toISO() }}",
+        "options": {
+          "timeZone": {
+            "__rl": true,
+            "mode": "id",
+            "value": "Asia/Kolkata"
+          }
+        }
+      },
+      "id": "f67f4487-39ea-4359-b11f-9ead1e050f41",
+      "name": "Check Calendar Conflicts",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2128,
+        -288
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "yE7A8dEbeeXTnl23",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Validate and Deduplicate Recipients').first().json;\nconst e = ctx.extracted || {};\nconst scheduled = !!(e.start_date && e.start_time);\nlet conflicts = [];\nif (scheduled) {\n  let evs = [];\n  try { evs = $('Check Calendar Conflicts').all().map(i => i.json).filter(x => x && x.id); } catch (err) { evs = []; }\n  conflicts = evs.filter(x => x.status !== 'cancelled').map(x => ({ id: x.id, summary: x.summary || '(no title)', start: x.start && (x.start.dateTime || x.start.date), end: x.end && (x.end.dateTime || x.end.date) }));\n}\nconst endKnown = !!(e.end_time);\nconst sufficient = scheduled && !!e.title;\nconst can_create_event = sufficient && conflicts.length === 0 && !ctx.test_mode && !ctx.duplicate_submission;\nconst startISO = scheduled ? e.start_date + 'T' + e.start_time + ':00+05:30' : null;\nconst endDate = e.end_date || e.start_date;\nlet endISO = null;\nif (scheduled) {\n  if (endKnown) endISO = endDate + 'T' + e.end_time + ':00+05:30';\n  else { const d = new Date(startISO); d.setHours(d.getHours() + 1); endISO = d.toISOString(); }\n}\nreturn [{ json: Object.assign({}, ctx, { scheduled, calendar_conflicts: conflicts, has_conflict: conflicts.length > 0, event_time_sufficient: sufficient, end_time_assumed: scheduled && !endKnown, can_create_event, event_start: startISO, event_end: endISO, timezone: 'Asia/Kolkata' }) }];"
+      },
+      "id": "5cfbcfa0-a33f-4b3a-a7c2-1744bfaff498",
+      "name": "Evaluate Calendar Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cc",
+              "leftValue": "={{ $json.can_create_event }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4c2b3ed2-b879-4d39-acba-813580bdf2b0",
+      "name": "Can Create Event?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2768,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "ghorpadeatharva87@gmail.com",
+          "mode": "list",
+          "cachedResultName": "ghorpadeatharva87@gmail.com"
+        },
+        "start": "={{ $json.event_start }}",
+        "end": "={{ $json.event_end }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $json.recipients.map(r => r.email).join(\",\") }}"
+          ],
+          "description": "={{ $json.extracted.summary || $json.notice_text }}",
+          "guestsCanInviteOthers": false,
+          "guestsCanSeeOtherGuests": false,
+          "location": "={{ $json.extracted.venue || \"\" }}",
+          "sendUpdates": "all",
+          "summary": "={{ $json.extracted.title }}"
+        }
+      },
+      "id": "38bddf59-6aa7-4bf5-8562-36fe53859fbb",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2992,
+        -224
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "yE7A8dEbeeXTnl23",
+          "name": "Google Calendar account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $('Evaluate Calendar Result').first().json;\nconst e = c.extracted || {};\nlet created = null;\ntry { const ev = $('Create Calendar Event').all()[0]; created = ev && ev.json && ev.json.htmlLink ? ev.json.htmlLink : null; } catch (err) {}\nconst lines = [];\nlines.push('Notice for ' + c.branch + ' ' + c.year_label + ' Division ' + c.division);\nlines.push('');\nif (e.title) lines.push(e.title);\nlines.push(e.summary || c.notice_text);\nif (e.venue) lines.push('Venue: ' + e.venue);\nif (e.start_date) lines.push('Date: ' + e.start_date + (e.start_time ? ' at ' + e.start_time + ' IST' : ''));\nif (e.deadline) lines.push('Deadline: ' + e.deadline);\nif (Array.isArray(e.links) && e.links.length) lines.push('Links: ' + e.links.join(', '));\nif (c.has_conflict) lines.push('Note: a calendar clash exists for this slot; please wait for confirmation.');\nif (!c.ai_ok) { lines.length = 0; lines.push('Notice for ' + c.branch + ' ' + c.year_label + ' Division ' + c.division); lines.push(''); lines.push(c.notice_text); }\nconst body = lines.join('\\n');\nconst subject = '[Campus Notice] ' + (e.title || (c.branch + ' ' + c.year_label + ' Div ' + c.division));\nconst html = body.split('\\n').map(l => l ? '<p>' + l.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</p>' : '').join('');\nconst eventMissing = !!c.scheduled && !created;\nconst send_allowed = !c.test_mode && c.live_send_authorized === true && !c.duplicate_submission && c.recipient_count > 0 && c.recipient_count <= 300 && c.ai_ok === true && !c.has_conflict && !eventMissing;\nconst blockReasons = [];\nif (c.test_mode) blockReasons.push('test mode is ON');\nif (c.live_send_authorized !== true) blockReasons.push('live sending not authorized');\nif (c.duplicate_submission) blockReasons.push('duplicate submission');\nif (c.recipient_count === 0) blockReasons.push('no matching students');\nif (c.recipient_count > 300) blockReasons.push('recipient count exceeds safety cap of 300');\nif (c.ai_ok !== true) blockReasons.push('AI extraction failed or unreliable');\nif (c.has_conflict) blockReasons.push('calendar conflict needs resolution');\nif (eventMissing) blockReasons.push('calendar event was not created');\nreturn [{ json: Object.assign({}, c, { subject, message_text: body, message_html: html, calendar_event_link: created, send_allowed, block_reasons: blockReasons, preview: { recipients: c.recipients.map(r => r.email), recipient_count: c.recipient_count, subject, message: body } }) }];"
+      },
+      "id": "a32245e5-7e07-4a97-80fa-e76e92fa78a5",
+      "name": "Generate Notification and Preview",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3216,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "sa",
+              "leftValue": "={{ $json.send_allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ffb377ad-5828-4cf9-8acc-3f6a9de09211",
+      "name": "Live Send Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2336,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "recipients",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "subject,message_html",
+        "options": {}
+      },
+      "id": "97f050d1-6521-41bd-be63-154c163d646d",
+      "name": "One Item per Recipient",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2560,
+        672
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipients.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.message_html }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Campus Autopilot"
+        }
+      },
+      "id": "692e38dd-fa26-4d6e-9cb5-b95c590205ca",
+      "name": "Send Notification Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2784,
+        672
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "webhookId": "e87534da-8626-4a34-b9a4-e81583ba47ef",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bUqnUD7YU1PkPvuV",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Generate Notification and Preview').first().json;\nlet results = [];\nif (m.send_allowed) { try { results = $('Send Notification Email').all().map(i => i.json); } catch (err) { results = []; } }\nconst failures = results.filter(r => r.error).map(r => String(r.error.message || r.error).slice(0, 200));\nconst sentCount = m.send_allowed ? results.filter(r => !r.error).length : 0;\nlet status;\nif (m.recipient_count === 0) status = 'no_matching_students';\nelse if (m.duplicate_submission) status = 'duplicate_blocked';\nelse if (!m.send_allowed) status = 'preview_only';\nelse status = failures.length ? 'sent_with_failures' : 'sent';\nconst sd = $getWorkflowStaticData('global');\nsd.sent = sd.sent || {}; sd.log = sd.log || [];\nconst entry = { at: new Date().toISOString(), hash: m.notice_hash, status, recipients: m.recipient_count, sent: sentCount, failed: failures.length };\nif (m.send_allowed && sentCount > 0) sd.sent[m.notice_hash] = entry.at;\nsd.log.push(entry); if (sd.log.length > 50) sd.log.shift();\nreturn [{ json: {\n  status, test_mode: m.test_mode, send_blocked_because: m.block_reasons,\n  recipient_count: m.recipient_count, recipients_preview: m.preview.recipients,\n  invalid_emails: m.invalid_emails, sent_count: sentCount, failed_count: failures.length, failures,\n  calendar_conflicts: m.calendar_conflicts, calendar_event_link: m.calendar_event_link,\n  ai_ok: m.ai_ok, ai_error: m.ai_error, subject: m.subject, message_preview: m.message_text\n} }];"
+      },
+      "id": "be8b853b-c998-4fdf-9a19-38e59db4f940",
+      "name": "Record Execution Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3008,
+        752
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "status",
+              "value": "rejected_invalid_form",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "errors",
+              "value": "={{ $json.errors.join(\"; \") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "352d3ee1-c495-4ac4-99e1-3c7c9b64a4da",
+      "name": "Reject Invalid Submission",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        464
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Submit College Notice": {
+      "main": [
+        [
+          {
+            "node": "Validate Form Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Form Fields": {
+      "main": [
+        [
+          {
+            "node": "Form Is Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Is Valid?": {
+      "main": [
+        [
+          {
+            "node": "AI Extract Notice Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Invalid Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Extract Notice Fields": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "Get Row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Validate and Deduplicate Recipients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Deduplicate Recipients": {
+      "main": [
+        [
+          {
+            "node": "Has Schedule?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Schedule?": {
+      "main": [
+        [
+          {
+            "node": "Check Calendar Conflicts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evaluate Calendar Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Calendar Conflicts": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Calendar Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Calendar Result": {
+      "main": [
+        [
+          {
+            "node": "Can Create Event?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can Create Event?": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Notification and Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Generate Notification and Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Notification and Preview": {
+      "main": [
+        [
+          {
+            "node": "Live Send Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Live Send Allowed?": {
+      "main": [
+        [
+          {
+            "node": "One Item per Recipient",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Execution Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Item per Recipient": {
+      "main": [
+        [
+          {
+            "node": "Send Notification Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Notification Email": {
+      "main": [
+        [
+          {
+            "node": "Record Execution Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ee68f57f-4ac3-4885-acdb-8b40bccfb653",
+  "meta": {
+    "instanceId": "f3661b5d416b70ffb7295033f15c6da39c2b568c002f8f2b6d2c5e57d72492dc"
+  },
+  "nodeGroups": [
+    {
+      "id": "f4bed031-53d6-484f-8caf-b4e0de4fa33e",
+      "name": "Receive notice",
+      "nodeIds": [
+        "0e342e34-5633-4864-a69f-e24c1d3cc707",
+        "164e9616-f337-4353-bab6-05868e8a49ae"
+      ],
+      "description": "Takes the faculty form submission and checks every field; incomplete notices are rejected"
+    },
+    {
+      "id": "bbc77e64-e9cb-4556-b64e-be8e926a2858",
+      "name": "Identify recipients",
+      "nodeIds": [
+        "f8199593-dac1-45c9-86c9-dfe34e20800a",
+        "81f116c0-1dc8-4a5d-bf77-2641e07d9009",
+        "9a6dfa52-c121-466d-aacb-046322ff5c6b",
+        "31645df0-cc99-4e51-a102-4616edcb0570"
+      ],
+      "description": "AI extracts notice details, then finds students matching branch, year and division without bad emails or duplicates"
+    },
+    {
+      "id": "ed66b3a3-0329-4f44-90f0-53b01167e29a",
+      "name": "Check schedule",
+      "nodeIds": [
+        "29339d79-31c8-4ea8-9e7d-a0b3673e168a",
+        "f67f4487-39ea-4359-b11f-9ead1e050f41",
+        "5cfbcfa0-a33f-4b3a-a7c2-1744bfaff498"
+      ],
+      "description": "If the notice has a date and time, looks for overlapping calendar events"
+    },
+    {
+      "id": "70510d2e-200c-4909-b691-78a6c8eee53d",
+      "name": "Draft notification",
+      "nodeIds": [
+        "4c2b3ed2-b879-4d39-acba-813580bdf2b0",
+        "38bddf59-6aa7-4bf5-8562-36fe53859fbb",
+        "a32245e5-7e07-4a97-80fa-e76e92fa78a5"
+      ],
+      "description": "Adds a calendar event only when safe, then writes the student message and preview"
+    },
+    {
+      "id": "c5569b4f-cb88-4473-9d4a-be46bd4db59d",
+      "name": "Deliver and record",
+      "nodeIds": [
+        "ffb377ad-5828-4cf9-8acc-3f6a9de09211",
+        "97f050d1-6521-41bd-be63-154c163d646d",
+        "692e38dd-fa26-4d6e-9cb5-b95c590205ca",
+        "be8b853b-c998-4fdf-9a19-38e59db4f940"
+      ],
+      "description": "Sends emails only when live mode is authorized, then logs the outcome"
+    }
+  ],
+  "id": "kwxTaPoY1ZjMxJzV",
+  "tags": []
+}
